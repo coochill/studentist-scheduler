@@ -29,4 +29,9 @@ class PatientCase extends Model
     {
         return $this->hasMany(CaseImage::class);
     }
+
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(PatientCaseTask::class);
+    }
 }

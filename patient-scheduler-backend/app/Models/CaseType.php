@@ -13,4 +13,9 @@ class CaseType extends Model
     {
         return $this->hasMany(PatientCase::class);
     }
+
+    public function checklistItems(): HasMany
+    {
+        return $this->hasMany(CaseTypeChecklistItem::class)->orderBy('sort_order');
+    }
 }

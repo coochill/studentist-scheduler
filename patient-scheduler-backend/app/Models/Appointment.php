@@ -16,6 +16,15 @@ class Appointment extends Model
         'notes',
     ];
 
+    protected function casts(): array
+    {
+        return [
+            'appointment_date' => 'date:Y-m-d',
+            'start_time' => 'datetime:H:i',
+            'end_time' => 'datetime:H:i',
+        ];
+    }
+
     public function patientCase(): BelongsTo
     {
         return $this->belongsTo(PatientCase::class);

@@ -13,7 +13,7 @@ class PatientController extends Controller
         $search = trim((string) $request->query('search', ''));
 
         $patients = Patient::query()
-            ->with('patientCases.caseType')
+            ->with('patientCases.caseType', 'patientCases.tasks')
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($query) use ($search) {
                     $query->where('first_name', 'like', "%{$search}%")
@@ -31,19 +31,19 @@ class PatientController extends Controller
     {
         $patient = Patient::create($this->validatedData($request));
 
-        return response()->json($patient->load('patientCases.caseType'), 201);
+        return response()->json($patient->load('patientCases.caseType', 'patientCases.tasks'), 201);
     }
 
     public function show(Patient $patient): JsonResponse
     {
-        return response()->json($patient->load('patientCases.caseType', 'patientCases.images'));
+        return response()->json($patient->load('patientCases.caseType.checklistItems', 'patientCases.images', 'patientCases.tasks', 'patientCases.appointments.patientCase.caseType'));
     }
 
     public function update(Request $request, Patient $patient): JsonResponse
     {
         $patient->update($this->validatedData($request));
 
-        return response()->json($patient->fresh()->load('patientCases.caseType'));
+        return response()->json($patient->fresh()->load('patientCases.caseType', 'patientCases.tasks'));
     }
 
     public function destroy(Patient $patient): JsonResponse
