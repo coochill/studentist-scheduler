@@ -6,6 +6,7 @@ use App\Models\PatientCaseTask;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class PatientCaseTaskController extends Controller
 {
@@ -13,7 +14,7 @@ class PatientCaseTaskController extends Controller
     {
         return response()->json(
             PatientCaseTask::query()
-                ->with('patientCase.patient', 'patientCase.caseType')
+                ->with('patientCase.patient', 'patientCase.caseType', 'appointments')
                 ->when($request->filled('patient_case_id'), fn ($query) => $query->where('patient_case_id', $request->integer('patient_case_id')))
                 ->orderBy('id')
                 ->get(),
@@ -29,8 +30,14 @@ class PatientCaseTaskController extends Controller
             'status' => ['required', 'string', Rule::in(['pending', 'in_progress', 'completed'])],
         ]);
 
+        if ($validated['status'] === 'completed' && ! $patientCaseTask->hasCompletedAppointment()) {
+            throw ValidationException::withMessages([
+                'status' => 'This task can only be marked complete once its linked appointment is completed.',
+            ]);
+        }
+
         $patientCaseTask->update($validated);
 
-        return response()->json($patientCaseTask->fresh()->load('checklistItem'));
+        return response()->json($patientCaseTask->fresh()->load('checklistItem', 'appointments'));
     }
 }

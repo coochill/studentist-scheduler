@@ -9,6 +9,7 @@ class CaseType extends Model
 {
     protected $fillable = ['name', 'description'];
 
+
     public function patientCases(): HasMany
     {
         return $this->hasMany(PatientCase::class);

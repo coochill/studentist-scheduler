@@ -34,10 +34,15 @@ class PatientController extends Controller
         return response()->json($patient->load('patientCases.caseType', 'patientCases.tasks'), 201);
     }
 
-    public function show(Patient $patient): JsonResponse
-    {
-        return response()->json($patient->load('patientCases.caseType.checklistItems', 'patientCases.images', 'patientCases.tasks', 'patientCases.appointments.patientCase.caseType'));
-    }
+ public function show(Patient $patient): JsonResponse
+{
+    return response()->json($patient->load(
+        'patientCases.caseType.checklistItems',
+        'patientCases.images',
+        'patientCases.tasks.appointments',
+        'patientCases.appointments.patientCase.caseType'
+    ));
+}
 
     public function update(Request $request, Patient $patient): JsonResponse
     {

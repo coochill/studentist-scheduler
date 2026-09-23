@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { Bell, CalendarDays, ChevronRight, LayoutDashboard, Menu, Search, Settings, Users, X } from 'lucide-react'
+import { CalendarDays, CheckCircle2, ChevronRight, LayoutDashboard, Menu, Search, Settings, Users, X } from 'lucide-react'
 import { api, type Appointment as AppointmentRecord, type CaseType, type Patient, type PatientCase, type PatientCaseTask } from './services/api'
 import './App.css'
 
@@ -31,9 +31,13 @@ function App() {
   }, [])
 
   const caseCount = patients.reduce((total, patient) => total + patient.patient_cases.length, 0)
-  const today = new Date().toISOString().slice(0, 10)
-  const todayAppointments = appointments.filter((appointment) => appointment.appointment_date === today)
+  const completedPatientsCount = patients.filter((patient) => {
+    const allTasks = patient.patient_cases.flatMap((patientCase) => patientCase.tasks ?? [])
+    return allTasks.length > 0 && allTasks.every((task) => task.status === 'completed')
+  }).length
   const visibleAppointments = appointments.slice(0, 3)
+  const now = new Date()
+  const [shouldOpenAppointmentForm, setShouldOpenAppointmentForm] = useState(false)
 
   return (
     <div className="app-shell">
@@ -44,13 +48,15 @@ function App() {
       </aside>
       {isSidebarOpen && <button className="sidebar-backdrop" onClick={() => setIsSidebarOpen(false)} aria-label="Close navigation" />}
       <main className="main-content">
-        <header className="topbar"><div className="topbar-title"><button className="icon-button mobile-menu-button" onClick={() => setIsSidebarOpen(true)} aria-label="Open navigation"><Menu size={20} /></button><div><p className="eyebrow">Tuesday, September 22, 2026</p><h1>Good morning, Studentist</h1></div></div><div className="topbar-actions"><button className="icon-button" aria-label="Search"><Search size={19} /></button><button className="icon-button notification-button" aria-label="Notifications"><Bell size={19} /><span /></button><div className="profile-chip"><span className="avatar">DR</span><span className="profile-name">Dr. Reyes</span></div></div></header>
+        <header className="topbar"><div className="topbar-title"><button className="icon-button mobile-menu-button" onClick={() => setIsSidebarOpen(true)} aria-label="Open navigation"><Menu size={20} /></button><div><p className="eyebrow">{formatFullDate(now)}</p><h1>{getGreeting(now)}, Studentist</h1></div></div><div className="topbar-actions"><div className="profile-chip"><span className="avatar">DR</span><span className="profile-name">Dr. Mirania</span></div></div></header>
         {activePage === 'Patients' ? <PatientsPage patients={patients} appointments={appointments} caseTypes={caseTypes} isLoading={isLoading} loadError={loadError} onCreated={(patient) => setPatients((current) => [...current, patient].sort((a, b) => `${a.last_name}${a.first_name}`.localeCompare(`${b.last_name}${b.first_name}`)))} onDeleted={(id) => setPatients((current) => current.filter((patient) => patient.id !== id))} /> : activePage === 'Appointments' ? (
   <AppointmentsPage
     appointments={appointments}
     patients={patients}
     isLoading={isLoading}
     loadError={loadError}
+    autoOpenForm={shouldOpenAppointmentForm}
+    onAutoOpenHandled={() => setShouldOpenAppointmentForm(false)}
     onCreated={(appointment) =>
       setAppointments((current) =>
         [...current, appointment].sort((a, b) =>
@@ -74,17 +80,74 @@ function App() {
     }
   />
 ) : activePage === 'Settings' ? <SettingsPage caseTypes={caseTypes} isLoading={isLoading} loadError={loadError} onChanged={setCaseTypes} /> : <section className="page-content">
-          <div className="welcome-row"><div><p className="section-kicker">Overview</p><h2>Your clinic at a glance</h2></div><button className="primary-button" onClick={() => setActivePage('Appointments')}><CalendarDays size={17} />Schedule appointment</button></div>
+          <div className="welcome-row"><div><p className="section-kicker">Overview</p><h2>Your clinic at a glance</h2></div><button className="primary-button" onClick={() => { setActivePage('Appointments'); setShouldOpenAppointmentForm(true) }}><CalendarDays size={17} />Schedule appointment</button></div>
           {loadError && <div className="api-alert" role="alert">{loadError}</div>}
-          <div className="summary-grid"><SummaryCard label="Total patients" value={isLoading ? '—' : String(patients.length)} detail="Live from Laravel API" tone="mint" icon={<Users size={20} />} /><SummaryCard label="Today's appointments" value={isLoading ? '—' : String(todayAppointments.length).padStart(2, '0')} detail="Live from Laravel API" tone="peach" icon={<CalendarDays size={20} />} /><SummaryCard label="Open patient cases" value={isLoading ? '—' : String(caseCount)} detail="Across all patients" tone="lilac" icon={<LayoutDashboard size={20} />} /></div>
-          <div className="dashboard-grid"><section className="content-panel"><div className="panel-heading"><div><p className="section-kicker">Live schedule</p><h3>Upcoming appointments</h3></div><button className="text-button">View calendar <ChevronRight size={16} /></button></div>{isLoading ? <p className="empty-state">Loading appointments...</p> : visibleAppointments.length === 0 ? <p className="empty-state">No appointments scheduled yet.</p> : visibleAppointments.map((appointment) => <Appointment key={appointment.id} appointment={appointment} />)}</section><section className="content-panel"><div className="panel-heading"><div><p className="section-kicker">Connected data</p><h3>Patient updates</h3></div></div><Activity initials="API" name={`${patients.length} patients loaded`} text="Retrieved from Laravel" time="Now" /><Activity initials="API" name={`${caseCount} cases loaded`} text="Linked to patient records" time="Now" /><Activity initials="API" name={`${appointments.length} appointments loaded`} text="Linked to patient cases" time="Now" /></section></div>
+          <div className="summary-grid"><SummaryCard label="Total patients" value={isLoading ? '—' : String(patients.length)} detail="Live from Laravel API" tone="mint" icon={<Users size={20} />} /><SummaryCard label="Completed patients" value={isLoading ? '—' : String(completedPatientsCount).padStart(2, '0')} detail="All checklist tasks completed" tone="peach" icon={<CheckCircle2 size={20} />} /><SummaryCard label="Open patient cases" value={isLoading ? '—' : String(caseCount)} detail="Across all patients" tone="lilac" icon={<LayoutDashboard size={20} />} /></div>
+          <div className="dashboard-grid"><section className="content-panel"><div className="panel-heading"><div><p className="section-kicker">Live schedule</p><h3>Upcoming appointments</h3></div><button className="text-button">View calendar <ChevronRight size={16} /></button></div>{isLoading ? <p className="empty-state">Loading appointments...</p> : visibleAppointments.length === 0 ? <p className="empty-state">No appointments scheduled yet.</p> : visibleAppointments.map((appointment) => <Appointment key={appointment.id} appointment={appointment} />)}</section><section className="content-panel"><div className="panel-heading"><div><p className="section-kicker">Patient overview</p><h3>Patients at a glance</h3></div></div>{isLoading ? <p className="empty-state">Loading overview...</p> : <DashboardPieChart data={[{ label: 'Total patients', value: patients.length, color: '#6366f1' }, { label: 'Completed patients', value: completedPatientsCount, color: '#22c55e' }, { label: 'Open patient cases', value: caseCount, color: '#f59e0b' }]} />}</section></div>
         </section>}
       </main>
     </div>
   )
 }
 
+function getGreeting(date: Date): string {
+  const hour = date.getHours()
+  if (hour < 12) return 'Good morning'
+  if (hour < 18) return 'Good afternoon'
+  return 'Good evening'
+}
+
+function formatFullDate(date: Date): string {
+  return date.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+}
+
 function SummaryCard({ label, value, detail, tone, icon }: { label: string; value: string; detail: string; tone: string; icon: ReactNode }) { return <article className="summary-card"><div className={`summary-icon ${tone}`}>{icon}</div><p>{label}</p><strong>{value}</strong><span>{detail}</span></article> }
+
+// Lightweight CSS-conic-gradient pie chart — no charting library required.
+// Note: the three dashboard metrics (total patients, completed patients,
+// open cases) aren't parts of one whole, so slice size here reflects each
+// value's share relative to the other two, not a true breakdown of "total
+// patients". Swap in a real charting lib if that distinction matters.
+function DashboardPieChart({ data }: { data: { label: string; value: number; color: string }[] }) {
+  const total = data.reduce((sum, item) => sum + item.value, 0)
+  let cumulative = 0
+  const gradientStops = data
+    .map((item) => {
+      const start = total === 0 ? 0 : (cumulative / total) * 360
+      cumulative += item.value
+      const end = total === 0 ? 0 : (cumulative / total) * 360
+      return `${item.color} ${start}deg ${end}deg`
+    })
+    .join(', ')
+
+  return (
+    <div className="pie-chart-wrap">
+      <div
+        className="pie-chart"
+        role="img"
+        aria-label={data.map((item) => `${item.label}: ${item.value}`).join(', ')}
+        style={{ background: total === 0 ? '#e5e7eb' : `conic-gradient(${gradientStops})` }}
+      />
+      <ul className="pie-chart-legend">
+        {data.map((item) => (
+          <li key={item.label}>
+            <span className="pie-chart-swatch" style={{ backgroundColor: item.color }} />
+            <span>{item.label}</span>
+            <strong>{item.value}</strong>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function appointmentTaskSummary(appointment: AppointmentRecord): string {
+  if (appointment.tasks && appointment.tasks.length > 0) {
+    return appointment.tasks.map((task) => task.title).join(', ')
+  }
+  return appointment.patient_case.case_type.name
+}
+
 function Appointment({
   appointment,
   onUpdated,
@@ -112,8 +175,11 @@ function Appointment({
 
   async function save() {
     try {
+      // Editing here only changes date/status/notes — the tasks this
+      // appointment was booked for stay the same, so we resend the
+      // existing task_ids rather than letting the backend re-derive them.
       const updated = await api.updateAppointment(appointment.id, {
-        patient_case_id: appointment.patient_case_id,
+        task_ids: appointment.tasks.map((task) => task.id),
         appointment_date: date,
         start_time: appointment.start_time,
         end_time: appointment.end_time,
@@ -150,7 +216,7 @@ function Appointment({
         <strong>
           {patient.first_name} {patient.last_name}
         </strong>
-        <span>{appointment.patient_case.case_type.name}</span>
+        <span>{appointmentTaskSummary(appointment)}</span>
       </div>
 
       {isEditing ? (
@@ -219,8 +285,6 @@ function Appointment({
     </div>
   )
 }
-function Activity({ initials, name, text, time }: { initials: string; name: string; text: string; time: string }) { return <div className="activity-row"><span className="activity-avatar">{initials}</span><div><strong>{name}</strong><span>{text}</span></div><time>{time}</time></div> }
-
 function PatientsPage({ patients, appointments, caseTypes, isLoading, loadError, onCreated, onDeleted }: { patients: Patient[]; appointments: AppointmentRecord[]; caseTypes: CaseType[]; isLoading: boolean; loadError: string | null; onCreated: (patient: Patient) => void; onDeleted: (id: number) => void }) {
   const [search, setSearch] = useState('')
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -411,156 +475,71 @@ function PatientCaseRow({ patientCase, patientId, caseTypes, onUpdated, onDelete
   return <><article className="detail-case"><div className="case-type-icon">CT</div><div><strong>{patientCase.case_type?.name || 'Unnamed case'}</strong><span>{patientCase.details || 'No case details recorded'}</span>{patientCase.images && patientCase.images.length > 0 && <small>{patientCase.images.length} image{patientCase.images.length === 1 ? '' : 's'}</small>}</div><div className="case-actions"><button className="text-button" onClick={() => setIsEditing(true)}>Edit</button><button className="danger-button" onClick={() => void remove()}>Delete</button></div></article><TaskList tasks={patientCase.tasks || []} /></>
 }
 
+function taskStatusLabel(status: PatientCaseTask['status']): string {
+  if (status === 'in_progress') return 'In progress'
+  return status.charAt(0).toUpperCase() + status.slice(1)
+}
+
+function formatAppointmentTime(startTime: string, endTime: string): string {
+  const format = (value: string) => {
+    const [hours, minutes] = value.split(':')
+    const hour = Number(hours)
+    const period = hour >= 12 ? 'PM' : 'AM'
+    const displayHour = hour % 12 || 12
+    return `${displayHour}:${minutes} ${period}`
+  }
+  return `${format(startTime)} - ${format(endTime)}`
+}
+
+// Read-only: task status and scheduling are now driven entirely by the
+// appointment(s) linked to each task. The studentist marks progress by
+// updating the appointment itself (see Appointment / PatientAppointmentRow),
+// not by checking anything here.
 function TaskList({ tasks }: { tasks: PatientCaseTask[] }) {
-  const [taskRows, setTaskRows] = useState(tasks)
-  const [savingId, setSavingId] = useState<number | null>(null)
-
-  async function saveTask(
-    task: PatientCaseTask,
-    patch: Partial<PatientCaseTask>
-  ) {
-    setSavingId(task.id)
-
-    try {
-      const updated = await api.updatePatientCaseTask(task.id, {
-        start_date: patch.start_date ?? task.start_date,
-        expected_end_date:
-          patch.expected_end_date ?? task.expected_end_date,
-        completed_date:
-          patch.completed_date ?? task.completed_date,
-        status: patch.status ?? task.status,
-      })
-
-      setTaskRows((current) =>
-        current.map((item) =>
-          item.id === updated.id ? updated : item
-        )
-      )
-    } finally {
-      setSavingId(null)
-    }
-  }
-
-  async function toggleTask(task: PatientCaseTask) {
-    const isCompleted = task.status === 'completed'
-
-    await saveTask(task, {
-      status: isCompleted ? 'in_progress' : 'completed',
-      completed_date: isCompleted
-        ? null
-        : new Date().toISOString().slice(0, 10),
-    })
-  }
-
-  if (taskRows.length === 0) return null
+  if (tasks.length === 0) return null
 
   return (
     <div className="task-list">
       <p className="task-list-title">Checklist</p>
 
-      {taskRows.map((task) => {
+      {tasks.map((task) => {
         const isCompleted = task.status === 'completed'
+        const scheduledAppointments = (task.appointments ?? []).filter(
+          (appointment) => appointment.status !== 'cancelled'
+        )
 
         return (
           <div
             className={`task-row ${isCompleted ? 'completed' : ''}`}
             key={task.id}
           >
-            <button
-              type="button"
+            <span
               className={`task-check ${isCompleted ? 'done' : ''}`}
-              onClick={() => void toggleTask(task)}
-              disabled={savingId === task.id}
-              aria-label={
-                isCompleted
-                  ? `Mark ${task.title} as incomplete`
-                  : `Mark ${task.title} as completed`
-              }
+              aria-hidden="true"
             >
               {isCompleted ? '✓' : ''}
-            </button>
+            </span>
 
             <div className="task-main">
               <strong>{task.title}</strong>
+              <span className={`status ${task.status}`}>
+                {taskStatusLabel(task.status)}
+              </span>
 
-              <div className="task-fields">
-                <label>
-                  Start date
-                  <input
-                    type="date"
-                    value={task.start_date || ''}
-                    onChange={(event) =>
-                      setTaskRows((current) =>
-                        current.map((item) =>
-                          item.id === task.id
-                            ? {
-                                ...item,
-                                start_date: event.target.value || null,
-                              }
-                            : item
-                        )
-                      )
-                    }
-                    onBlur={(event) =>
-                      void saveTask(task, {
-                        start_date: event.target.value || null,
-                      })
-                    }
-                  />
-                </label>
-
-                <label>
-                  Expected end date
-                  <input
-                    type="date"
-                    value={task.expected_end_date || ''}
-                    onChange={(event) =>
-                      void saveTask(task, {
-                        expected_end_date:
-                          event.target.value || null,
-                      })
-                    }
-                  />
-                </label>
-
-                <label>
-                  Completed date
-                  <input
-                    type="date"
-                    value={task.completed_date || ''}
-                    onChange={(event) =>
-                      void saveTask(task, {
-                        completed_date:
-                          event.target.value || null,
-                        status: event.target.value
-                          ? 'completed'
-                          : 'in_progress',
-                      })
-                    }
-                  />
-                </label>
-
-                <label>
-                  Status
-                  <select
-                    value={task.status}
-                    disabled={savingId === task.id}
-                    onChange={(event) =>
-                      void saveTask(task, {
-                        status:
-                          event.target
-                            .value as PatientCaseTask['status'],
-                      })
-                    }
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="in_progress">
-                      In progress
-                    </option>
-                    <option value="completed">Completed</option>
-                  </select>
-                </label>
-              </div>
+              {scheduledAppointments.length === 0 ? (
+                <small className="case-muted">Not yet scheduled.</small>
+              ) : (
+                scheduledAppointments.map((appointment) => (
+                  <small key={appointment.id}>
+                    {appointment.appointment_date} ·{' '}
+                    {formatAppointmentTime(
+                      appointment.start_time,
+                      appointment.end_time
+                    )}{' '}
+                    ({appointment.status})
+                  </small>
+                ))
+              )}
             </div>
           </div>
         )
@@ -578,7 +557,7 @@ function PatientAppointmentRow({ appointment, onUpdated, onDeleted }: { appointm
 
   async function save() {
     try {
-      const updated = await api.updateAppointment(appointment.id, { patient_case_id: appointment.patient_case_id, appointment_date: date, start_time: appointment.start_time, end_time: appointment.end_time, status, notes: notes || null })
+      const updated = await api.updateAppointment(appointment.id, { task_ids: appointment.tasks.map((task) => task.id), appointment_date: date, start_time: appointment.start_time, end_time: appointment.end_time, status, notes: notes || null })
       onUpdated(updated)
       setIsEditing(false)
     } catch {
@@ -596,7 +575,7 @@ function PatientAppointmentRow({ appointment, onUpdated, onDeleted }: { appointm
     }
   }
 
-  return <div className="patient-appointment-row"><div><strong>{appointment.appointment_date}</strong><span>{appointment.start_time} - {appointment.end_time}</span><small>{appointment.patient_case.case_type.name}</small></div>{isEditing ? <div className="appointment-edit-fields"><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /><select value={status} onChange={(event) => setStatus(event.target.value)}><option value="scheduled">Scheduled</option><option value="confirmed">Confirmed</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select><input value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Notes" /><button className="text-button" onClick={() => void save()}>Save</button></div> : <div className="case-actions"><span className={`status ${appointment.status}`}>{appointment.status}</span><button className="text-button" onClick={() => setIsEditing(true)}>Edit</button><button className="danger-button" onClick={() => void remove()}>Delete</button></div>}{error && <small className="error-text">{error}</small>}</div>
+  return <div className="patient-appointment-row"><div><strong>{appointment.appointment_date}</strong><span>{appointment.start_time} - {appointment.end_time}</span><small>{appointmentTaskSummary(appointment)}</small></div>{isEditing ? <div className="appointment-edit-fields"><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /><select value={status} onChange={(event) => setStatus(event.target.value)}><option value="scheduled">Scheduled</option><option value="confirmed">Confirmed</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select><input value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Notes" /><button className="text-button" onClick={() => void save()}>Save</button></div> : <div className="case-actions"><span className={`status ${appointment.status}`}>{appointment.status}</span><button className="text-button" onClick={() => setIsEditing(true)}>Edit</button><button className="danger-button" onClick={() => void remove()}>Delete</button></div>}{error && <small className="error-text">{error}</small>}</div>
 }
 
 function AppointmentsPage({
@@ -604,6 +583,8 @@ function AppointmentsPage({
   patients,
   isLoading,
   loadError,
+  autoOpenForm,
+  onAutoOpenHandled,
   onCreated,
   onUpdated,
   onDeleted,
@@ -612,6 +593,8 @@ function AppointmentsPage({
   patients: Patient[]
   isLoading: boolean
   loadError: string | null
+  autoOpenForm?: boolean
+  onAutoOpenHandled?: () => void
   onCreated: (appointment: AppointmentRecord) => void
   onUpdated: (appointment: AppointmentRecord) => void
   onDeleted: (id: number) => void
@@ -619,6 +602,13 @@ function AppointmentsPage({
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [statusFilter, setStatusFilter] = useState('')
   const filteredAppointments = statusFilter ? appointments.filter((appointment) => appointment.status === statusFilter) : appointments
+
+  useEffect(() => {
+    if (autoOpenForm) {
+      setIsFormOpen(true)
+      onAutoOpenHandled?.()
+    }
+  }, [autoOpenForm, onAutoOpenHandled])
 
   return <section className="page-content"><div className="welcome-row"><div><p className="section-kicker">Clinic schedule</p><h2>Appointments</h2></div><button className="primary-button" onClick={() => setIsFormOpen((open) => !open)}><CalendarDays size={17} />{isFormOpen ? 'Close form' : 'Schedule appointment'}</button></div>{loadError && <div className="api-alert" role="alert">{loadError}</div>}{isFormOpen && <AppointmentForm patients={patients} onCreated={(appointment) => { onCreated(appointment); setIsFormOpen(false) }} />}<div className="appointments-toolbar"><div><p className="section-kicker">All appointments</p><h3>{filteredAppointments.length} scheduled</h3></div><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Filter appointments by status"><option value="">All statuses</option><option value="scheduled">Scheduled</option><option value="confirmed">Confirmed</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option></select></div><div className="appointment-list">{isLoading ? <p className="empty-state">Loading appointments...</p> : filteredAppointments.length === 0 ? <p className="empty-state">No appointments found.</p> : filteredAppointments.map((appointment) => (
   <Appointment
@@ -630,11 +620,19 @@ function AppointmentsPage({
 ))}</div></section>
 }
 
+// Each entry pairs a task with the patient case it belongs to, so the form
+// can show the case name next to the task and enforce the "same case only"
+// rule when a studentist selects multiple tasks for one appointment.
+interface SelectableTask {
+  task: PatientCaseTask
+  patientCase: PatientCase
+}
+
 function AppointmentForm({ patients, onCreated }: { patients: Patient[]; onCreated: (appointment: AppointmentRecord) => void }) {
   const [patientId, setPatientId] = useState('')
-  const [caseId, setCaseId] = useState<number | null>(null)
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null)
-  const [isLoadingCases, setIsLoadingCases] = useState(false)
+  const [isLoadingTasks, setIsLoadingTasks] = useState(false)
+  const [selectedTaskIds, setSelectedTaskIds] = useState<number[]>([])
   const [date, setDate] = useState('')
   const [startTime, setStartTime] = useState('09:00')
   const [endTime, setEndTime] = useState('10:00')
@@ -642,34 +640,65 @@ function AppointmentForm({ patients, onCreated }: { patients: Patient[]; onCreat
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
+  const availableTasks: SelectableTask[] = (selectedPatient?.patient_cases ?? [])
+    .flatMap((patientCase) => (patientCase.tasks ?? []).map((task) => ({ task, patientCase })))
+    .filter(({ task }) => task.status !== 'completed')
+
+  // Once a task is picked, every other task must come from the same
+  // patient case, since the appointment still carries one patient_case_id.
+  const lockedCaseId = selectedTaskIds.length > 0
+    ? availableTasks.find(({ task }) => task.id === selectedTaskIds[0])?.patientCase.id ?? null
+    : null
+
+  const lockedCase = lockedCaseId
+    ? availableTasks.find(({ patientCase }) => patientCase.id === lockedCaseId)?.patientCase
+    : null
+
   async function selectPatient(value: string) {
     setPatientId(value)
-    setCaseId(null)
     setSelectedPatient(null)
+    setSelectedTaskIds([])
+    setError(null)
     if (!value) return
 
-    setIsLoadingCases(true)
+    setIsLoadingTasks(true)
     try {
       const patient = await api.getPatient(Number(value))
       setSelectedPatient(patient)
-      setCaseId(patient.patient_cases[0]?.id ?? null)
     } catch {
-      setError('Unable to load this patient\'s cases. Please try again.')
+      setError('Unable to load this patient\'s tasks. Please try again.')
     } finally {
-      setIsLoadingCases(false)
+      setIsLoadingTasks(false)
     }
+  }
+
+  function toggleTask(taskId: number, patientCaseId: number) {
+    setSelectedTaskIds((current) => {
+      if (current.includes(taskId)) return current.filter((id) => id !== taskId)
+      if (lockedCaseId !== null && lockedCaseId !== patientCaseId) return current
+      return [...current, taskId]
+    })
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError(null)
+
+    if (selectedTaskIds.length === 0) {
+      setError('Select at least one task for this appointment.')
+      return
+    }
+
     setIsSaving(true)
     try {
-      if (!caseId) {
-        setError('This patient has no case yet. Add a case in the patient record first.')
-        return
-      }
-      const appointment = await api.createAppointment({ patient_case_id: caseId, appointment_date: date, start_time: startTime, end_time: endTime, status: 'scheduled', notes: notes || null })
+      const appointment = await api.createAppointment({
+        task_ids: selectedTaskIds,
+        appointment_date: date,
+        start_time: startTime,
+        end_time: endTime,
+        status: 'scheduled',
+        notes: notes || null,
+      })
       onCreated(appointment)
     } catch {
       setError('Unable to schedule this appointment. Check the time and try again.')
@@ -678,7 +707,7 @@ function AppointmentForm({ patients, onCreated }: { patients: Patient[]; onCreat
     }
   }
 
-  return <form className="appointment-form" onSubmit={handleSubmit}><div className="form-heading"><div><p className="section-kicker">New booking</p><h3>Schedule appointment</h3></div></div>{error && <div className="api-alert" role="alert">{error}</div>}<div className="form-grid"><label>Patient<select required value={patientId} onChange={(event) => void selectPatient(event.target.value)}><option value="">Select existing patient</option>{patients.map((patient) => <option key={patient.id} value={patient.id}>{patient.first_name} {patient.last_name}</option>)}</select></label><div className="selected-case-field"><span>Patient case</span><strong>{isLoadingCases ? 'Loading patient details...' : selectedPatient?.patient_cases[0]?.case_type?.name || 'No case available'}</strong><small>{selectedPatient && caseId ? 'Automatically selected from this patient record.' : 'Select a patient with an existing case.'}</small></div><label>Date<input required type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label><label>Start time<input required type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} /></label><label>End time<input required type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} /></label><label className="form-notes">Notes<textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Optional appointment notes" rows={2} /></label></div><div className="form-actions"><button className="primary-button" disabled={isSaving || isLoadingCases || !caseId}>{isSaving ? 'Scheduling...' : 'Schedule appointment'}</button></div></form>
+  return <form className="appointment-form" onSubmit={handleSubmit}><div className="form-heading"><div><p className="section-kicker">New booking</p><h3>Schedule appointment</h3></div></div>{error && <div className="api-alert" role="alert">{error}</div>}<div className="form-grid"><label>Patient<select required value={patientId} onChange={(event) => void selectPatient(event.target.value)}><option value="">Select existing patient</option>{patients.map((patient) => <option key={patient.id} value={patient.id}>{patient.first_name} {patient.last_name}</option>)}</select></label><div className="selected-case-field"><span>Task(s)</span>{isLoadingTasks ? <strong>Loading patient tasks...</strong> : !selectedPatient ? <small>Select a patient to see their pending tasks.</small> : availableTasks.length === 0 ? <small>This patient has no pending tasks.</small> : <div className="task-checkbox-list">{availableTasks.map(({ task, patientCase }) => <label key={task.id} className="task-checkbox-row"><input type="checkbox" checked={selectedTaskIds.includes(task.id)} disabled={lockedCaseId !== null && lockedCaseId !== patientCase.id && !selectedTaskIds.includes(task.id)} onChange={() => toggleTask(task.id, patientCase.id)} /><span>{task.title} <small>({patientCase.case_type?.name || 'Unnamed case'})</small></span></label>)}</div>}</div><div className="selected-case-field"><span>Patient case</span><strong>{lockedCase?.case_type?.name || 'Determined by selected task(s)'}</strong><small>Automatically derived from the task(s) you select above.</small></div><label>Date<input required type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label><label>Start time<input required type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} /></label><label>End time<input required type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} /></label><label className="form-notes">Notes<textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Optional appointment notes" rows={2} /></label></div><div className="form-actions"><button className="primary-button" disabled={isSaving || isLoadingTasks || selectedTaskIds.length === 0}>{isSaving ? 'Scheduling...' : 'Schedule appointment'}</button></div></form>
 }
 
 function SettingsPage({ caseTypes, isLoading, loadError, onChanged }: { caseTypes: CaseType[]; isLoading: boolean; loadError: string | null; onChanged: (caseTypes: CaseType[]) => void }) {

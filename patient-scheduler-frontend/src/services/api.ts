@@ -12,6 +12,17 @@ export interface ChecklistItem {
   sort_order: number
 }
 
+// A trimmed-down view of an appointment, attached to each task so patient
+// details can display "when is/was this task scheduled" without pulling
+// in the full Appointment shape (patient, case, other tasks, etc).
+export interface TaskAppointment {
+  id: number
+  appointment_date: string
+  start_time: string
+  end_time: string
+  status: string
+}
+
 export interface PatientCaseTask {
   id: number
   patient_case_id: number
@@ -21,6 +32,13 @@ export interface PatientCaseTask {
   expected_end_date: string | null
   completed_date: string | null
   status: 'pending' | 'in_progress' | 'completed'
+  // Computed by the backend: true once this task has a linked appointment
+  // whose status is "completed".
+  can_complete: boolean
+  // The appointment(s) this task is scheduled under. Status and dates on
+  // the task above are now derived automatically from these rather than
+  // entered manually.
+  appointments?: TaskAppointment[]
 }
 
 export interface PatientCase {
@@ -60,6 +78,20 @@ export interface Appointment {
   status: string
   notes: string | null
   patient_case: PatientCase & { patient: Patient; case_type: CaseType }
+  // One or more checklist tasks this appointment was booked for. All of
+  // them belong to the same patient_case as patient_case_id above.
+  tasks: PatientCaseTask[]
+}
+
+// Appointments are now created/updated from a set of tasks rather than a
+// case directly — the backend derives patient_case_id from the tasks.
+export interface AppointmentPayload {
+  task_ids: number[]
+  appointment_date: string
+  start_time: string
+  end_time: string
+  status: string
+  notes: string | null
 }
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8000/api'
@@ -128,12 +160,12 @@ export const api = {
     method: 'DELETE',
     headers: { Accept: 'application/json' },
   }),
-  createAppointment: (payload: Omit<Appointment, 'id' | 'patient_case'>) => request<Appointment>('/appointments', {
+  createAppointment: (payload: AppointmentPayload) => request<Appointment>('/appointments', {
     method: 'POST',
     headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   }),
-  updateAppointment: (id: number, payload: Omit<Appointment, 'id' | 'patient_case'>) => request<Appointment>(`/appointments/${id}`, {
+  updateAppointment: (id: number, payload: AppointmentPayload) => request<Appointment>(`/appointments/${id}`, {
     method: 'PUT',
     headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
