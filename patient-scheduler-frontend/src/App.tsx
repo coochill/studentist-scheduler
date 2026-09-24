@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { CalendarDays, CheckCircle2, ChevronRight, LayoutDashboard, Menu, Search, Settings, Users, X } from 'lucide-react'
 import { api, type Appointment as AppointmentRecord, type CaseType, type Patient, type PatientCase, type PatientCaseTask } from './services/api'
 import './App.css'
+import schedpxIcon from './assets/schedpx-logo.svg';
 
 const navigation = [
   { label: 'Dashboard', icon: LayoutDashboard },
@@ -42,7 +43,7 @@ function App() {
   return (
     <div className="app-shell">
       <aside className={`sidebar ${isSidebarOpen ? 'sidebar-open' : ''}`}>
-        <div className="brand-row"><div className="brand-mark">S</div><div><strong>Studentist</strong><span>Patient Scheduler</span></div><button className="icon-button close-menu-button" onClick={() => setIsSidebarOpen(false)} aria-label="Close navigation"><X size={19} /></button></div>
+        <div className="brand-row"><img src={schedpxIcon} alt="SchedPx" className="brand-logo" /><button className="icon-button close-menu-button" onClick={() => setIsSidebarOpen(false)} aria-label="Close navigation"><X size={19} /></button></div>
         <nav className="navigation" aria-label="Main navigation"><p className="nav-label">Workspace</p>{navigation.map(({ label, icon: Icon }) => <button className={`nav-item ${activePage === label ? 'active' : ''}`} key={label} onClick={() => { setActivePage(label); setIsSidebarOpen(false) }}><Icon size={19} /><span>{label}</span></button>)}</nav>
         <div className="sidebar-footer"><div className="help-card"><p>Need a hand?</p><span>Visit the help center</span><ChevronRight size={16} /></div><p className="version-label">Patient Scheduler · v0.1</p></div>
       </aside>
@@ -83,7 +84,7 @@ function App() {
           <div className="welcome-row"><div><p className="section-kicker">Overview</p><h2>Your clinic at a glance</h2></div><button className="primary-button" onClick={() => { setActivePage('Appointments'); setShouldOpenAppointmentForm(true) }}><CalendarDays size={17} />Schedule appointment</button></div>
           {loadError && <div className="api-alert" role="alert">{loadError}</div>}
           <div className="summary-grid"><SummaryCard label="Total patients" value={isLoading ? '—' : String(patients.length)} detail="Live from Laravel API" tone="mint" icon={<Users size={20} />} /><SummaryCard label="Completed patients" value={isLoading ? '—' : String(completedPatientsCount).padStart(2, '0')} detail="All checklist tasks completed" tone="peach" icon={<CheckCircle2 size={20} />} /><SummaryCard label="Open patient cases" value={isLoading ? '—' : String(caseCount)} detail="Across all patients" tone="lilac" icon={<LayoutDashboard size={20} />} /></div>
-          <div className="dashboard-grid"><section className="content-panel"><div className="panel-heading"><div><p className="section-kicker">Live schedule</p><h3>Upcoming appointments</h3></div><button className="text-button">View calendar <ChevronRight size={16} /></button></div>{isLoading ? <p className="empty-state">Loading appointments...</p> : visibleAppointments.length === 0 ? <p className="empty-state">No appointments scheduled yet.</p> : visibleAppointments.map((appointment) => <Appointment key={appointment.id} appointment={appointment} />)}</section><section className="content-panel"><div className="panel-heading"><div><p className="section-kicker">Patient overview</p><h3>Patients at a glance</h3></div></div>{isLoading ? <p className="empty-state">Loading overview...</p> : <DashboardPieChart data={[{ label: 'Total patients', value: patients.length, color: '#6366f1' }, { label: 'Completed patients', value: completedPatientsCount, color: '#22c55e' }, { label: 'Open patient cases', value: caseCount, color: '#f59e0b' }]} />}</section></div>
+          <div className="dashboard-grid"><section className="content-panel"><div className="panel-heading"><div><p className="section-kicker">Live schedule</p><h3>Upcoming appointments</h3></div><button className="text-button">View calendar <ChevronRight size={16} /></button></div>{isLoading ? <p className="empty-state">Loading appointments...</p> : visibleAppointments.length === 0 ? <p className="empty-state">No appointments scheduled yet.</p> : visibleAppointments.map((appointment) => <Appointment key={appointment.id} appointment={appointment} />)}</section><section className="content-panel"><div className="panel-heading"><div><p className="section-kicker">Patient overview</p><h3>Patients at a glance</h3></div></div>{isLoading ? <p className="empty-state">Loading overview...</p> : <DashboardPieChart data={[{ label: 'Total patients', value: patients.length, color: '#357b64' }, { label: 'Completed patients', value: completedPatientsCount, color: '#bc7055' }, { label: 'Open patient cases', value: caseCount, color: '#756b9b' }]} centerValue={patients.length} centerLabel="Patients" />}</section></div>
         </section>}
       </main>
     </div>
@@ -103,12 +104,21 @@ function formatFullDate(date: Date): string {
 
 function SummaryCard({ label, value, detail, tone, icon }: { label: string; value: string; detail: string; tone: string; icon: ReactNode }) { return <article className="summary-card"><div className={`summary-icon ${tone}`}>{icon}</div><p>{label}</p><strong>{value}</strong><span>{detail}</span></article> }
 
-// Lightweight CSS-conic-gradient pie chart — no charting library required.
-// Note: the three dashboard metrics (total patients, completed patients,
-// open cases) aren't parts of one whole, so slice size here reflects each
-// value's share relative to the other two, not a true breakdown of "total
-// patients". Swap in a real charting lib if that distinction matters.
-function DashboardPieChart({ data }: { data: { label: string; value: number; color: string }[] }) {
+// Lightweight CSS-conic-gradient donut chart — no charting library required.
+// The center shows one meaningful headline number (total patients); the
+// ring's three segments aren't parts of that same whole (total patients,
+// completed patients, and open cases aren't mutually exclusive), so their
+// relative sizes are a rough visual comparison, not a true breakdown.
+// Swap in a real charting lib if that distinction needs to be precise.
+function DashboardPieChart({
+  data,
+  centerValue,
+  centerLabel,
+}: {
+  data: { label: string; value: number; color: string }[]
+  centerValue: number
+  centerLabel: string
+}) {
   const total = data.reduce((sum, item) => sum + item.value, 0)
   let cumulative = 0
   const gradientStops = data
@@ -122,12 +132,18 @@ function DashboardPieChart({ data }: { data: { label: string; value: number; col
 
   return (
     <div className="pie-chart-wrap">
-      <div
-        className="pie-chart"
-        role="img"
-        aria-label={data.map((item) => `${item.label}: ${item.value}`).join(', ')}
-        style={{ background: total === 0 ? '#e5e7eb' : `conic-gradient(${gradientStops})` }}
-      />
+      <div className="pie-chart-shell">
+        <div
+          className="pie-chart"
+          role="img"
+          aria-label={data.map((item) => `${item.label}: ${item.value}`).join(', ')}
+          style={{ background: total === 0 ? '#e5e7eb' : `conic-gradient(${gradientStops})` }}
+        />
+        <div className="pie-chart-center">
+          <strong>{centerValue}</strong>
+          <span>{centerLabel}</span>
+        </div>
+      </div>
       <ul className="pie-chart-legend">
         {data.map((item) => (
           <li key={item.label}>
