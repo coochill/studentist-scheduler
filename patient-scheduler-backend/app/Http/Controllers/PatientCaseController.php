@@ -12,7 +12,7 @@ class PatientCaseController extends Controller
     public function index(Request $request): JsonResponse
     {
         $patientCases = PatientCase::query()
-            ->with('patient', 'caseType', 'images')
+            ->with('patient', 'caseType', 'images', 'tasks')   // ← add 'tasks'
             ->when($request->filled('patient_id'), fn ($query) => $query->where('patient_id', $request->integer('patient_id')))
             ->when($request->filled('case_type_id'), fn ($query) => $query->where('case_type_id', $request->integer('case_type_id')))
             ->latest()

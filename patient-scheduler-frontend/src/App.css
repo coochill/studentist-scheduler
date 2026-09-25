@@ -970,27 +970,36 @@ html, body {
   border-top: 1px solid var(--color-border);
 }
 
-.detail-case > div:last-child {
-  display: grid;
-  gap: var(--spacing-xs);
+.detail-case-body {
   flex: 1;
+  min-width: 0;
 }
 
-.detail-case strong {
+.detail-case-body strong {
+  display: block;
   color: var(--color-text);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
 }
 
-.detail-case span,
-.detail-case small {
+.detail-case-body span,
+.detail-case-body small {
+  display: block;
+  margin-top: var(--spacing-xs);
   color: var(--color-text-secondary);
   font-size: var(--font-size-xs);
   line-height: 1.5;
 }
 
-.detail-case small {
+.detail-case-body small {
   color: var(--color-success);
+}
+
+.detail-case-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
 }
 
 .case-type-icon {

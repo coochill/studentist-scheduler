@@ -36,8 +36,34 @@ function App() {
     setAppointments((current) => [...current, appointment].sort((a, b) => `${a.appointment_date}${a.start_time}`.localeCompare(`${b.appointment_date}${b.start_time}`)))
   }
 
+  function updatePatient(updated: Patient) {
+    setPatients((current) =>
+      current.map((p) => (p.id === updated.id ? { ...p, ...updated } : p))
+    )
+  }
+
+  function updateAppointment(updated: Appointment) {
+    setAppointments((current) =>
+      current.map((a) => (a.id === updated.id ? updated : a))
+    )
+  }
+
   function renderPage() {
-    if (activePage === 'Patients') return <PatientsPage patients={patients} appointments={appointments} caseTypes={caseTypes} isLoading={isLoading} loadError={loadError} onCreated={addPatient} onDeleted={(id) => setPatients((current) => current.filter((patient) => patient.id !== id))} />
+    if (activePage === 'Patients')
+  return (
+    <PatientsPage
+      patients={patients}
+      appointments={appointments}
+      caseTypes={caseTypes}
+      isLoading={isLoading}
+      loadError={loadError}
+      onCreated={addPatient}
+      onUpdated={updatePatient}
+      onDeleted={(id) => setPatients((current) => current.filter((p) => p.id !== id))}
+      onAppointmentUpdated={updateAppointment}
+      onAppointmentDeleted={(id) => setAppointments((current) => current.filter((a) => a.id !== id))}
+    />
+  )
     if (activePage === 'Appointments') return <AppointmentsPage appointments={appointments} patients={patients} isLoading={isLoading} loadError={loadError} autoOpenForm={shouldOpenAppointmentForm} onAutoOpenHandled={() => setShouldOpenAppointmentForm(false)} onCreated={addAppointment} onUpdated={(updated) => setAppointments((current) => current.map((item) => item.id === updated.id ? updated : item))} onDeleted={(id) => setAppointments((current) => current.filter((item) => item.id !== id))} />
     if (activePage === 'Settings') return <SettingsPage caseTypes={caseTypes} isLoading={isLoading} loadError={loadError} onChanged={setCaseTypes} />
     return <DashboardPage patients={patients} appointments={appointments} isLoading={isLoading} loadError={loadError} onSchedule={() => { setActivePage('Appointments'); setShouldOpenAppointmentForm(true) }} />

@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\DB;
 
 class AppointmentController extends Controller
 {
@@ -37,25 +38,27 @@ class AppointmentController extends Controller
     {
         $validated = $this->validatedData($request);
         $tasks = $this->resolveTasks($validated['task_ids']);
-        $patientCaseId = $tasks->first()->patient_case_id;
 
         $this->ensureNoConflict($validated);
 
-        $appointment = Appointment::create([
-            'patient_case_id' => $patientCaseId,
-            'appointment_date' => $validated['appointment_date'],
-            'start_time' => $validated['start_time'],
-            'end_time' => $validated['end_time'],
-            'status' => $validated['status'] ?? 'scheduled',
-            'notes' => $validated['notes'] ?? null,
-        ]);
+        $appointment = DB::transaction(function () use ($validated, $tasks) {
+            $appointment = Appointment::create([
+                'patient_case_id' => $tasks->first()->patient_case_id,
+                'appointment_date' => $validated['appointment_date'],
+                'start_time' => $validated['start_time'],
+                'end_time' => $validated['end_time'],
+                'status' => $validated['status'] ?? 'scheduled',
+                'notes' => $validated['notes'] ?? null,
+            ]);
 
-        $appointment->tasks()->sync($tasks->pluck('id'));
-        $this->syncTaskStatuses($tasks->pluck('id'));
+            $appointment->tasks()->sync($tasks->pluck('id'));
+            $this->syncTaskStatuses($tasks->pluck('id'));
+
+            return $appointment;
+        });
 
         return response()->json($appointment->load(self::WITH), 201);
     }
-
     public function show(Appointment $appointment): JsonResponse
     {
         return response()->json($appointment->load(self::WITH));
@@ -65,35 +68,34 @@ class AppointmentController extends Controller
     {
         $validated = $this->validatedData($request);
         $tasks = $this->resolveTasks($validated['task_ids']);
-        $patientCaseId = $tasks->first()->patient_case_id;
         $previousTaskIds = $appointment->tasks()->pluck('patient_case_tasks.id');
 
         $this->ensureNoConflict($validated, $appointment);
 
-        $appointment->update([
-            'patient_case_id' => $patientCaseId,
-            'appointment_date' => $validated['appointment_date'],
-            'start_time' => $validated['start_time'],
-            'end_time' => $validated['end_time'],
-            'status' => $validated['status'] ?? $appointment->status,
-            'notes' => $validated['notes'] ?? null,
-        ]);
+        DB::transaction(function () use ($appointment, $validated, $tasks, $previousTaskIds) {
+            $appointment->update([
+                'patient_case_id' => $tasks->first()->patient_case_id,
+                'appointment_date' => $validated['appointment_date'],
+                'start_time' => $validated['start_time'],
+                'end_time' => $validated['end_time'],
+                'status' => $validated['status'] ?? $appointment->status,
+                'notes' => $validated['notes'] ?? null,
+            ]);
 
-        $appointment->tasks()->sync($tasks->pluck('id'));
-        // Recalculate both the tasks now linked and any tasks that were
-        // unlinked by this edit, since either change can affect status.
-        $this->syncTaskStatuses($previousTaskIds->merge($tasks->pluck('id'))->unique());
+            $appointment->tasks()->sync($tasks->pluck('id'));
+            $this->syncTaskStatuses($previousTaskIds->merge($tasks->pluck('id'))->unique());
+        });
 
         return response()->json($appointment->fresh()->load(self::WITH));
     }
-
     public function destroy(Appointment $appointment): JsonResponse
     {
         $taskIds = $appointment->tasks()->pluck('patient_case_tasks.id');
 
-        $appointment->delete();
-
-        $this->syncTaskStatuses($taskIds);
+        DB::transaction(function () use ($appointment, $taskIds) {
+            $appointment->delete();
+            $this->syncTaskStatuses($taskIds);
+        });
 
         return response()->json(null, 204);
     }
@@ -112,36 +114,39 @@ class AppointmentController extends Controller
             return;
         }
 
-        PatientCaseTask::query()->whereIn('id', $taskIds)->get()->each(function (PatientCaseTask $task) {
-            $appointments = $task->appointments()->get();
+        PatientCaseTask::query()
+            ->whereIn('id', $taskIds)
+            ->with('appointments')                       // ← the fix
+            ->get()
+            ->each(function (PatientCaseTask $task) {
+                $appointments = $task->appointments;      // ← use loaded relation
 
-            $completed = $appointments->first(fn ($appointment) => $appointment->status === 'completed');
-            if ($completed) {
-                $task->update([
-                    'status' => 'completed',
-                    'start_date' => $task->start_date ?? $completed->appointment_date->format('Y-m-d'),
-                    'completed_date' => $completed->appointment_date->format('Y-m-d'),
-                ]);
-                return;
-            }
+                $completed = $appointments->first(fn ($appointment) => $appointment->status === 'completed');
+                if ($completed) {
+                    $task->update([
+                        'status' => 'completed',
+                        'start_date' => $task->start_date ?? $completed->appointment_date->format('Y-m-d'),
+                        'completed_date' => $completed->appointment_date->format('Y-m-d'),
+                    ]);
+                    return;
+                }
 
-            $active = $appointments->first(fn ($appointment) => $appointment->status !== 'cancelled');
-            if ($active) {
+                $active = $appointments->first(fn ($appointment) => $appointment->status !== 'cancelled');
+                if ($active) {
+                    $task->update([
+                        'status' => 'in_progress',
+                        'start_date' => $task->start_date ?? $active->appointment_date->format('Y-m-d'),
+                        'completed_date' => null,
+                    ]);
+                    return;
+                }
+
                 $task->update([
-                    'status' => 'in_progress',
-                    'start_date' => $task->start_date ?? $active->appointment_date->format('Y-m-d'),
+                    'status' => 'pending',
                     'completed_date' => null,
                 ]);
-                return;
-            }
-
-            $task->update([
-                'status' => 'pending',
-                'completed_date' => null,
-            ]);
-        });
+            });
     }
-
     private function validatedData(Request $request): array
     {
         return $request->validate([
