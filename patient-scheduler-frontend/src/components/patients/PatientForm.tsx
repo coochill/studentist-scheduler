@@ -1,0 +1,11 @@
+import { useState, type FormEvent } from 'react'
+import { api, type Patient } from '../../services/api'
+
+export function PatientForm({ onCreated }: { onCreated: (patient: Patient) => void }) {
+  const [form, setForm] = useState({ first_name: '', last_name: '', contact_number: '', date_of_birth: '', address: '', notes: '' })
+  const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setSaving(true); setError(null); try { onCreated(await api.createPatient({ ...form, contact_number: form.contact_number || null, date_of_birth: form.date_of_birth || null, address: form.address || null, notes: form.notes || null })) } catch { setError('Unable to add patient. Check the required fields and try again.') } finally { setSaving(false) } }
+  const update = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }))
+  return <form className="patient-form" onSubmit={submit}><div className="form-heading"><p className="section-kicker">New record</p><h3>Add patient</h3></div>{error && <div className="api-alert" role="alert">{error}</div>}<div className="form-grid"><label>First name<input required value={form.first_name} onChange={(event) => update('first_name', event.target.value)} /></label><label>Last name<input required value={form.last_name} onChange={(event) => update('last_name', event.target.value)} /></label><label>Contact number<input value={form.contact_number} onChange={(event) => update('contact_number', event.target.value)} /></label><label>Date of birth<input type="date" value={form.date_of_birth} onChange={(event) => update('date_of_birth', event.target.value)} /></label><label className="form-notes">Address<textarea rows={2} value={form.address} onChange={(event) => update('address', event.target.value)} /></label><label className="form-notes">Notes<textarea rows={2} value={form.notes} onChange={(event) => update('notes', event.target.value)} /></label></div><div className="form-actions"><button className="primary-button" disabled={saving}>{saving ? 'Saving...' : 'Save patient'}</button></div></form>
+}
