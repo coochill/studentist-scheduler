@@ -1,0 +1,92 @@
+services:
+
+  backend:
+    build:
+      context: ./patient-scheduler-backend
+      dockerfile: Dockerfile
+    container_name: schedpx-backend
+    restart: unless-stopped
+
+    ports:
+      - "8000:8000"
+
+    volumes:
+      - ./patient-scheduler-backend:/var/www
+      - backend_vendor:/var/www/vendor
+
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:8000
+
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: patient_scheduler
+      DB_USERNAME: schedpx
+      DB_PASSWORD: schedpx_password
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+
+  frontend:
+    build:
+      context: ./patient-scheduler-frontend
+      dockerfile: Dockerfile
+
+    container_name: schedpx-frontend
+    restart: unless-stopped
+
+    ports:
+      - "5173:5173"
+
+    volumes:
+      - ./patient-scheduler-frontend:/app
+      - /app/node_modules
+
+    environment:
+      VITE_API_URL: http://localhost:8000/api
+
+    depends_on:
+      - backend
+
+
+  mysql:
+    image: mysql:8.0
+    container_name: schedpx-mysql
+    restart: unless-stopped
+
+    environment:
+      MYSQL_DATABASE: patient_scheduler
+      MYSQL_USER: schedpx
+      MYSQL_PASSWORD: schedpx_password
+      MYSQL_ROOT_PASSWORD: root_password
+
+    ports:
+      - "3307:3306"
+
+    volumes:
+      - schedpx_mysql_data:/var/lib/mysql
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u",
+          "root",
+          "-proot_password"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+
+volumes:
+  schedpx_mysql_data:
+  backend_vendor:
