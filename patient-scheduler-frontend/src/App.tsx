@@ -14,6 +14,7 @@ function App() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [caseTypes, setCaseTypes] = useState<CaseType[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [shouldOpenAppointmentForm, setShouldOpenAppointmentForm] = useState(false)
 
@@ -26,6 +27,15 @@ function App() {
       })
       .catch(() => setLoadError('Unable to load live clinic data. Start the Laravel API and try again.'))
       .finally(() => setIsLoading(false))
+  }, [])
+
+  useEffect(() => {
+    const refreshAppointments = () => {
+      setIsRefreshing(true)
+      api.getAppointments().then(setAppointments).catch(() => undefined).finally(() => setIsRefreshing(false))
+    }
+    const interval = window.setInterval(refreshAppointments, 7000)
+    return () => window.clearInterval(interval)
   }, [])
 
   function addPatient(patient: Patient) {
@@ -64,9 +74,9 @@ function App() {
       onAppointmentDeleted={(id) => setAppointments((current) => current.filter((a) => a.id !== id))}
     />
   )
-    if (activePage === 'Appointments') return <AppointmentsPage appointments={appointments} patients={patients} isLoading={isLoading} loadError={loadError} autoOpenForm={shouldOpenAppointmentForm} onAutoOpenHandled={() => setShouldOpenAppointmentForm(false)} onCreated={addAppointment} onUpdated={(updated) => setAppointments((current) => current.map((item) => item.id === updated.id ? updated : item))} onDeleted={(id) => setAppointments((current) => current.filter((item) => item.id !== id))} />
+    if (activePage === 'Appointments') return <AppointmentsPage appointments={appointments} patients={patients} isLoading={isLoading} isRefreshing={isRefreshing} loadError={loadError} autoOpenForm={shouldOpenAppointmentForm} onAutoOpenHandled={() => setShouldOpenAppointmentForm(false)} onCreated={addAppointment} onUpdated={(updated) => setAppointments((current) => current.map((item) => item.id === updated.id ? updated : item))} onDeleted={(id) => setAppointments((current) => current.filter((item) => item.id !== id))} />
     if (activePage === 'Settings') return <SettingsPage caseTypes={caseTypes} isLoading={isLoading} loadError={loadError} onChanged={setCaseTypes} />
-    return <DashboardPage patients={patients} appointments={appointments} isLoading={isLoading} loadError={loadError} onSchedule={() => { setActivePage('Appointments'); setShouldOpenAppointmentForm(true) }} />
+    return <DashboardPage patients={patients} appointments={appointments} isLoading={isLoading} loadError={loadError} onSchedule={() => { setActivePage('Appointments'); setShouldOpenAppointmentForm(true) }} onViewCalendar={() => setActivePage('Appointments')} />
   }
 
   return <AppLayout activePage={activePage} isSidebarOpen={isSidebarOpen} onNavigate={setActivePage} onOpenSidebar={() => setIsSidebarOpen(true)} onCloseSidebar={() => setIsSidebarOpen(false)}>{renderPage()}</AppLayout>
