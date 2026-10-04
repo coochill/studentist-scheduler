@@ -35,20 +35,11 @@ services:
     build:
       context: ./patient-scheduler-frontend
       dockerfile: Dockerfile
-
-    container_name: schedpx-frontend
+      args:
+        VITE_API_URL: http://localhost:8000/api
     restart: unless-stopped
-
     ports:
-      - "5173:5173"
-
-    volumes:
-      - ./patient-scheduler-frontend:/app
-      - /app/node_modules
-
-    environment:
-      VITE_API_URL: http://localhost:8000/api
-
+      - "80:80"  # Change 5173 to 80
     depends_on:
       - backend
 

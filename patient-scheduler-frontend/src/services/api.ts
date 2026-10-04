@@ -98,9 +98,19 @@ const API_URL = import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:8000/api'
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
-    headers: { Accept: 'application/json' },
     ...options,
+    headers: {
+      Accept: 'application/json',
+      ...(getAuthToken() ? { Authorization: `Bearer ${getAuthToken()}` } : {}),
+      ...options?.headers,
+    },
   })
+
+  if (response.status === 401) {
+    await endSession()
+    window.location.reload()
+    throw new Error('Authentication expired')
+  }
 
   if (!response.ok) {
     throw new Error(`API request failed with status ${response.status}`)
@@ -180,3 +190,4 @@ export const api = {
     body: JSON.stringify(payload),
   }),
 }
+import { endSession, getAuthToken } from '../auth'

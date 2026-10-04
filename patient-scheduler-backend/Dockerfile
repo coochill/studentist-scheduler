@@ -1,4 +1,4 @@
-FROM php:8.3-cli
+FROM php:8.3-fpm
 
 WORKDIR /var/www
 
@@ -23,6 +23,4 @@ RUN composer install \
     --no-interaction \
     --prefer-dist
 
-EXPOSE 8000
-
-CMD ["php", "-S", "0.0.0.0:8000", "-t", "public"]
+CMD ["php-fpm"]
