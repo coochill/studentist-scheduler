@@ -1,4 +1,3 @@
-```html
 <p align="center">
   <img src="patient-scheduler-frontend/src/assets/logo.svg" width="400" alt="SchedPx logo">
 </p>
@@ -15,7 +14,6 @@
   <img src="https://img.shields.io/badge/MySQL-8.0-4479A1?logo=mysql&logoColor=white" alt="MySQL 8.0">
   <img src="https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white" alt="Docker Compose">
 </p>
-```
 
 ## About
 
