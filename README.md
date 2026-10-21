@@ -1,17 +1,21 @@
-&#x20;\<p align="center">   \<img src="patient-scheduler-frontend/src/assets/logo.svg" width="400" alt="SchedPx logo"> \</p>
+```html
+<p align="center">
+  <img src="patient-scheduler-frontend/src/assets/logo.svg" width="400" alt="SchedPx logo">
+</p>
 
-\<h1 align="center">SCHEDPX: PATIENT SCHEDULING & CASE MANAGEMENT SYSTEM\</h1>
+<h1 align="center">SCHEDPX: PATIENT SCHEDULING &amp; CASE MANAGEMENT SYSTEM</h1>
 
-\<h3 align="center">Full-Stack Patient Scheduling Application\</h3>
-\<h5 align="center">Personal Portfolio Project · 2026\</h5>
+<h3 align="center">Full-Stack Patient Scheduling Application</h3>
+<h5 align="center">Personal Portfolio Project · 2026</h5>
 
-\<p align="center">
-&#x20; \<img src="[https://img.shields.io/badge/Laravel-13-FF2D20?logo=laravel&logoColor=white](https://img.shields.io/badge/Laravel-13-FF2D20?logo=laravel\&logoColor=white)" alt="Laravel 13">
-&#x20; \<img src="[https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black](https://img.shields.io/badge/React-19-61DAFB?logo=react\&logoColor=black)" alt="React">
-&#x20; \<img src="[https://img.shields.io/badge/TypeScript-Enabled-3178C6?logo=typescript&logoColor=white](https://img.shields.io/badge/TypeScript-Enabled-3178C6?logo=typescript\&logoColor=white)" alt="TypeScript">
-&#x20; \<img src="[https://img.shields.io/badge/MySQL-8.0-4479A1?logo=mysql&logoColor=white](https://img.shields.io/badge/MySQL-8.0-4479A1?logo=mysql\&logoColor=white)" alt="MySQL">
-&#x20; \<img src="[https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker\&logoColor=white)" alt="Docker">
-\</p>
+<p align="center">
+  <img src="https://img.shields.io/badge/Laravel-13-FF2D20?logo=laravel&logoColor=white" alt="Laravel 13">
+  <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black" alt="React 19">
+  <img src="https://img.shields.io/badge/TypeScript-Enabled-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
+  <img src="https://img.shields.io/badge/MySQL-8.0-4479A1?logo=mysql&logoColor=white" alt="MySQL 8.0">
+  <img src="https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white" alt="Docker Compose">
+</p>
+```
 
 ## About
 
