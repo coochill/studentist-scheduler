@@ -40,16 +40,32 @@ download the application images and build the frontend.
 ### Daily startup
 
 1. Open Docker Desktop and wait until it is running.
-2. Open PowerShell.
-3. Run:
+2. Double-click:
+
+```text
+C:\Users\<Your Windows username>\studentist-scheduler\Start-Studentist.ps1
+```
+
+3. The application will start automatically and open in your browser at
+   [http://localhost](http://localhost).
+
+If Windows does not allow the script to run by double-clicking, open PowerShell
+once and run:
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
+
+Then double-click `Start-Studentist.ps1` again.
+
+You can also start it manually:
 
 ```powershell
 cd "$HOME\studentist-scheduler"
-docker compose -f docker-compose.prod.yml up -d
-Start-Process "http://localhost"
+.\Start-Studentist.ps1
 ```
 
-4. Sign in using the email and password created during installation.
+Sign in using the email and password created during installation.
 
 Keep Docker Desktop running while using the application. You may minimize
 Docker Desktop; it does not need to remain visible.
@@ -72,13 +88,15 @@ When you are told that an update is available:
 
 ```powershell
 cd "$HOME\studentist-scheduler"
+.\Backup-Studentist.ps1
 git pull --ff-only
 docker compose -f docker-compose.prod.yml up -d --build
 docker compose -f docker-compose.prod.yml exec backend php artisan migrate --force
 ```
 
-Then open [http://localhost](http://localhost) again. Normal updates preserve
-the database volume and do not delete patient records.
+Then open [http://localhost](http://localhost) again. The backup is saved in
+the local `backups` folder. Normal updates preserve the database volume and do
+not delete patient records.
 
 ### Backing up patient records
 

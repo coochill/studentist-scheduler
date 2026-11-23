@@ -2,3 +2,4 @@
 SECURITY.md
 DEPLOYMENT.md
 .agents
+backups/*.sql

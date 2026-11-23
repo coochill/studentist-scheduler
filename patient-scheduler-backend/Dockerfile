@@ -22,5 +22,5 @@ COPY . .
 RUN composer install \
     --no-interaction \
     --prefer-dist
-
+    
 CMD ["php-fpm"]

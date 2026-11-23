@@ -29,7 +29,7 @@ class PatientController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $patient = Patient::create($this->validatedData($request));
+        $patient = $request->user()->patients()->create($this->validatedData($request));
 
         return response()->json($patient->load('patientCases.caseType', 'patientCases.tasks'), 201);
     }

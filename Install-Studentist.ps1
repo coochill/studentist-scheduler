@@ -41,6 +41,17 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Step 'Getting the application source'
 if (Test-Path (Join-Path $InstallPath '.git')) {
+    $backupScript = Join-Path $InstallPath 'Backup-Studentist.ps1'
+    if (Test-Path $backupScript) {
+        Write-Step 'Backing up the database before updating'
+        & $backupScript -InstallPath $InstallPath
+        if ($LASTEXITCODE -ne 0) {
+            throw 'The database backup failed. The update was not started.'
+        }
+    } else {
+        Write-Warning 'Backup-Studentist.ps1 is not available in this installation; create a manual backup before updating.'
+    }
+
     git -C $InstallPath pull --ff-only | Out-Host
 } elseif (Test-Path $InstallPath) {
     throw "Install path already exists but is not a Git repository: $InstallPath"

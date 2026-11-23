@@ -3,6 +3,7 @@
 use App\Http\Controllers\AppointmentController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CaseTypeController;
+use App\Http\Controllers\GoogleCalendarController;
 use App\Http\Controllers\PatientCaseController;
 use App\Http\Controllers\PatientCaseTaskController;
 use App\Http\Controllers\PatientController;
@@ -17,4 +18,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('patient-cases', PatientCaseController::class);
     Route::apiResource('patient-case-tasks', PatientCaseTaskController::class)->only(['index', 'update']);
     Route::apiResource('appointments', AppointmentController::class);
+    Route::get('/google-calendar/status', [GoogleCalendarController::class, 'status']);
+    Route::post('/google-calendar/connect', [GoogleCalendarController::class, 'connect']);
+    Route::delete('/google-calendar/disconnect', [GoogleCalendarController::class, 'disconnect']);
 });
