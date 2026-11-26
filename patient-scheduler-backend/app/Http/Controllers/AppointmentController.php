@@ -4,12 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\Appointment;
 use App\Models\PatientCaseTask;
+use App\Services\GoogleCalendarSyncService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
-use Illuminate\Support\Facades\DB;
 
 class AppointmentController extends Controller
 {
@@ -23,6 +25,7 @@ class AppointmentController extends Controller
     {
         $appointments = Appointment::query()
             ->with(self::WITH)
+            ->whereHas('patientCase.patient', fn ($query) => $query->where('user_id', $request->user()->getKey()))
             ->when($request->filled('date'), fn ($query) => $query->whereDate('appointment_date', $request->date('date')))
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')->toString()))
             ->when($request->filled('from'), fn ($query) => $query->whereDate('appointment_date', '>=', $request->date('from')))
@@ -34,10 +37,10 @@ class AppointmentController extends Controller
         return response()->json($appointments);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, GoogleCalendarSyncService $syncService): JsonResponse
     {
         $validated = $this->validatedData($request);
-        $tasks = $this->resolveTasks($validated['task_ids']);
+        $tasks = $this->resolveTasks($validated['task_ids'], $request->user()->getKey());
 
         $this->ensureNoConflict($validated);
 
@@ -57,17 +60,26 @@ class AppointmentController extends Controller
             return $appointment;
         });
 
+        $connection = $request->user()->googleCalendarConnection;
+        if ($connection?->status === 'connected') {
+            $syncService->syncAppointment($connection, $appointment);
+        }
+
         return response()->json($appointment->load(self::WITH), 201);
     }
-    public function show(Appointment $appointment): JsonResponse
+
+    public function show(Request $request, Appointment $appointment): JsonResponse
     {
+        $this->authorizeAppointment($appointment, $request->user()->getKey());
+
         return response()->json($appointment->load(self::WITH));
     }
 
-    public function update(Request $request, Appointment $appointment): JsonResponse
+    public function update(Request $request, Appointment $appointment, GoogleCalendarSyncService $syncService): JsonResponse
     {
+        $this->authorizeAppointment($appointment, $request->user()->getKey());
         $validated = $this->validatedData($request);
-        $tasks = $this->resolveTasks($validated['task_ids']);
+        $tasks = $this->resolveTasks($validated['task_ids'], $request->user()->getKey());
         $previousTaskIds = $appointment->tasks()->pluck('patient_case_tasks.id');
 
         $this->ensureNoConflict($validated, $appointment);
@@ -86,11 +98,22 @@ class AppointmentController extends Controller
             $this->syncTaskStatuses($previousTaskIds->merge($tasks->pluck('id'))->unique());
         });
 
-        return response()->json($appointment->fresh()->load(self::WITH));
+        $appointment = $appointment->fresh();
+        $connection = $request->user()->googleCalendarConnection;
+        if ($connection?->status === 'connected') {
+            $syncService->syncAppointment($connection, $appointment);
+        }
+
+        return response()->json($appointment->load(self::WITH));
     }
-    public function destroy(Appointment $appointment): JsonResponse
+
+    public function destroy(Request $request, Appointment $appointment, GoogleCalendarSyncService $syncService): JsonResponse
     {
+        $this->authorizeAppointment($appointment, $request->user()->getKey());
         $taskIds = $appointment->tasks()->pluck('patient_case_tasks.id');
+        $connection = $request->user()->googleCalendarConnection;
+
+        $syncService->deleteAppointment($connection, $appointment);
 
         DB::transaction(function () use ($appointment, $taskIds) {
             $appointment->delete();
@@ -128,6 +151,7 @@ class AppointmentController extends Controller
                         'start_date' => $task->start_date ?? $completed->appointment_date->format('Y-m-d'),
                         'completed_date' => $completed->appointment_date->format('Y-m-d'),
                     ]);
+
                     return;
                 }
 
@@ -138,6 +162,7 @@ class AppointmentController extends Controller
                         'start_date' => $task->start_date ?? $active->appointment_date->format('Y-m-d'),
                         'completed_date' => null,
                     ]);
+
                     return;
                 }
 
@@ -147,6 +172,7 @@ class AppointmentController extends Controller
                 ]);
             });
     }
+
     private function validatedData(Request $request): array
     {
         return $request->validate([
@@ -165,9 +191,18 @@ class AppointmentController extends Controller
      * patient case, since an appointment still carries a single
      * patient_case_id even though it can now cover several tasks.
      */
-    private function resolveTasks(array $taskIds): Collection
+    private function resolveTasks(array $taskIds, int $userId): Collection
     {
-        $tasks = PatientCaseTask::query()->whereIn('id', $taskIds)->get();
+        $tasks = PatientCaseTask::query()
+            ->whereIn('id', $taskIds)
+            ->whereHas('patientCase.patient', fn ($query) => $query->where('user_id', $userId))
+            ->get();
+
+        if ($tasks->count() !== count(array_unique($taskIds))) {
+            throw ValidationException::withMessages([
+                'task_ids' => 'One or more selected tasks are invalid or unavailable.',
+            ]);
+        }
 
         if ($tasks->pluck('patient_case_id')->unique()->count() > 1) {
             throw ValidationException::withMessages([
@@ -176,6 +211,16 @@ class AppointmentController extends Controller
         }
 
         return $tasks;
+    }
+
+    private function authorizeAppointment(Appointment $appointment, int $userId): void
+    {
+        abort_unless(
+            $appointment->patientCase()
+                ->whereHas('patient', fn (Builder $query) => $query->where('user_id', $userId))
+                ->exists(),
+            404,
+        );
     }
 
     private function ensureNoConflict(array $validated, ?Appointment $appointment = null): void
