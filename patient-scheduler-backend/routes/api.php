@@ -21,4 +21,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/google-calendar/status', [GoogleCalendarController::class, 'status']);
     Route::post('/google-calendar/connect', [GoogleCalendarController::class, 'connect']);
     Route::delete('/google-calendar/disconnect', [GoogleCalendarController::class, 'disconnect']);
+    Route::get('/google-calendar/sync/status', [GoogleCalendarController::class, 'syncStatus'])
+        ->middleware('throttle:30,1');
+    Route::post('/google-calendar/sync', [GoogleCalendarController::class, 'sync'])
+        ->middleware('throttle:5,1');
+    Route::post('/google-calendar/sync/retry', [GoogleCalendarController::class, 'retry'])
+        ->middleware('throttle:5,1');
 });

@@ -17,6 +17,9 @@ class GoogleCalendarConnectionTest extends TestCase
         $this->getJson('/api/google-calendar/status')->assertUnauthorized();
         $this->postJson('/api/google-calendar/connect')->assertUnauthorized();
         $this->deleteJson('/api/google-calendar/disconnect')->assertUnauthorized();
+        $this->getJson('/api/google-calendar/sync/status')->assertUnauthorized();
+        $this->postJson('/api/google-calendar/sync')->assertUnauthorized();
+        $this->postJson('/api/google-calendar/sync/retry')->assertUnauthorized();
     }
 
     public function test_user_can_view_their_disconnected_status(): void
@@ -30,7 +33,12 @@ class GoogleCalendarConnectionTest extends TestCase
                 'connected' => false,
                 'email' => null,
                 'status' => null,
+                'last_synced_at' => null,
             ]);
+
+        $this->actingAs($user, 'sanctum')
+            ->postJson('/api/google-calendar/sync')
+            ->assertStatus(409);
     }
 
     public function test_connection_refresh_token_is_encrypted_and_owned_by_user(): void
@@ -59,6 +67,7 @@ class GoogleCalendarConnectionTest extends TestCase
                 'connected' => false,
                 'email' => null,
                 'status' => null,
+                'last_synced_at' => null,
             ]);
     }
 

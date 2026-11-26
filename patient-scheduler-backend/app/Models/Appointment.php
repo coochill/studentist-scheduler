@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Appointment extends Model
 {
@@ -41,5 +42,10 @@ class Appointment extends Model
     {
         return $this->belongsToMany(PatientCaseTask::class, 'appointment_task', 'appointment_id', 'patient_case_task_id')
             ->withTimestamps();
+    }
+
+    public function googleCalendarEvent(): HasOne
+    {
+        return $this->hasOne(AppointmentGoogleCalendarEvent::class);
     }
 }
